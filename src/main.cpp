@@ -16,6 +16,8 @@
 
 #include <boost/program_options.hpp>
 
+#include <object_recognition_msgs/GetObjectInformation.h>
+
 std::string m_target_frame;
 std::string m_depth_frame_id;
 
@@ -49,7 +51,7 @@ class ObjectFilter {
   protected:
     ros::NodeHandle nh_;
     ros::Subscriber object_sub_;
-    ros::Publisher object_moveit_pub_, pub_obj_pose, pub_obj_poses;
+    ros::Publisher object_moveit_pub_;
     tf::TransformListener listener_;
     std::string object_topic_;
     geometry_msgs::PoseStamped msg_obj_cam_, msg_obj_pose;
@@ -62,85 +64,114 @@ class ObjectFilter {
       msg_obj_poses.header.frame_id = m_target_frame;
       msg_obj_poses.poses.clear();
 
-      moveit_msgs::CollisionObject msg_obj_moveit;
-      msg_obj_moveit.header.frame_id = m_target_frame;
-      //msg_obj_moveit.operation = moveit_msgs::CollisionObject::ADD;
-      msg_obj_moveit.primitives.push_back(msg_cylinder_); //msg_box_); //
-      //msg_obj_moveit.primitives.push_back(msg_box_);
+      moveit_msgs::CollisionObject msg_obj_collision;
+      msg_obj_collision.header.stamp = ros::Time::now();
+      msg_obj_collision.header.frame_id = m_target_frame;
+      msg_obj_collision.operation = moveit_msgs::CollisionObject::ADD;
+      msg_obj_collision.primitives.push_back(msg_cylinder_); //msg_box_); //
 
       //for the left hand
       //- Rotation best [-0.707, 0.000, -0.000, 0.707],
+      msg_obj_pose.header.frame_id = m_target_frame;
       msg_obj_pose.pose.orientation.x = -1;//-0.707;//-1;
       msg_obj_pose.pose.orientation.y = 0.0;
       msg_obj_pose.pose.orientation.z = 0.0;
       msg_obj_pose.pose.orientation.w = 0.000000253; //0.0;//0.707; //0.0;
-      msg_obj_pose.header.frame_id = m_target_frame;
 
-      //for the left hand romeo
       //position best: 0.47; 0.21;-0.11;
       msg_obj_pose.pose.position.x = 0.5;//0.47; //0.5;//
       msg_obj_pose.pose.position.y = 0.2;//0.2
       msg_obj_pose.pose.position.z = -0.13;//-0.11; //-0.13;//
-      msg_obj_moveit.primitive_poses.clear();
-      msg_obj_moveit.primitive_poses.push_back(msg_obj_pose.pose);
-      msg_obj_moveit.type.key = "0_l_romeo";
-      msg_obj_moveit.id = "0_l_romeo";
-      object_moveit_pub_.publish(msg_obj_moveit);
-      pub_obj_pose.publish(msg_obj_pose);
+
+      /*msg_obj_pose.pose.position.x = 0.419093;
+      msg_obj_pose.pose.position.y = 0.2;
+      msg_obj_pose.pose.position.z = -0.0640153;
+      msg_obj_pose.pose.orientation.x = 0.000000199;
+      msg_obj_pose.pose.orientation.y = 0.195092;
+      msg_obj_pose.pose.orientation.z = -0.000000199;
+      msg_obj_pose.pose.orientation.w = 0.980785;*/
+
+      msg_obj_collision.primitive_poses.clear();
+      msg_obj_collision.primitive_poses.push_back(msg_obj_pose.pose);
+      msg_obj_collision.type.key = "1";
+      msg_obj_collision.id = "block1";
+      object_moveit_pub_.publish(msg_obj_collision);
       msg_obj_poses.poses.push_back(msg_obj_pose.pose);
-      std::cout << msg_obj_moveit.id << std::endl << msg_obj_pose.pose << std::endl;
 
       //---------------------right
       //0.47; -0.18; -0.11; //best
       msg_obj_pose.pose.position.y = -msg_obj_pose.pose.position.y;
-      msg_obj_moveit.primitive_poses.clear();
-      msg_obj_moveit.primitive_poses.push_back(msg_obj_pose.pose);
-      msg_obj_moveit.type.key = "1_r_romeo";
-      msg_obj_moveit.id = "1_r_romeo";
-      object_moveit_pub_.publish(msg_obj_moveit);
-      pub_obj_pose.publish(msg_obj_pose);
+      msg_obj_collision.primitive_poses.clear();
+      msg_obj_collision.primitive_poses.push_back(msg_obj_pose.pose);
+      msg_obj_collision.type.key = "2";
+      msg_obj_collision.id = "block2";
+      object_moveit_pub_.publish(msg_obj_collision);
       msg_obj_poses.poses.push_back(msg_obj_pose.pose);
-      pub_obj_poses.publish(msg_obj_poses);
-      std::cout << msg_obj_moveit.id << std::endl << msg_obj_pose.pose << std::endl;
     }
 
-    void obj_cb(const object_recognition_msgs::RecognizedObjectArray::ConstPtr& msg)
+    bool getMeshFromDatabasePose(object_recognition_msgs::GetObjectInformation &obj_info)
+    {
+      //! Client for getting the mesh for a database object
+      ros::ServiceClient get_model_mesh_srv_;
+      std::string get_model_mesh_srv_name("get_object_info");
+      ros::Time start_time = ros::Time::now();
+      while ( !ros::service::waitForService(get_model_mesh_srv_name, ros::Duration(2.0)) )
+      {
+        ROS_INFO("Waiting for %s service to come up", get_model_mesh_srv_name.c_str());
+        if (!nh_.ok() || ros::Time::now() - start_time >= ros::Duration(5.0))
+          return false;
+      }
+
+      get_model_mesh_srv_ = nh_.serviceClient<object_recognition_msgs::GetObjectInformation>
+        (get_model_mesh_srv_name, false);
+
+      if ( !get_model_mesh_srv_.call(obj_info) )
+      {
+        ROS_ERROR("Get model mesh service service call failed altogether");
+        return false;
+      }
+      return true;
+    }
+
+    void obj_real(const object_recognition_msgs::RecognizedObjectArray::ConstPtr& msg)
     {
       try {
         int obj_id = 0;
-        for (it = msg->objects.begin(); it != msg->objects.end(); ++it) {
-          if (it->confidence > 0.80) {
-            tf::StampedTransform transform;
+        for (it = msg->objects.begin(); it != msg->objects.end(); ++it)
+        {
             listener_.waitForTransform(m_target_frame, msg->header.frame_id, msg->header.stamp, ros::Duration(3.0));
-            //listener_.lookupTransform(m_target_frame, msg->header.frame_id, msg->header.stamp, transform);
             msg_obj_cam_.header = msg->header;
             msg_obj_cam_.pose = it->pose.pose.pose;
             listener_.transformPose(m_target_frame, msg->header.stamp, msg_obj_cam_, m_depth_frame_id, msg_obj_pose);
-            //ROS_INFO_STREAM("object " << it->type.key);
 
-            //object_recognition_msgs::RecognizedObject msg_obj_ork(*it);
-            //ROS_INFO_STREAM(msg_obj_pose.pose);
-            //ROS_INFO_STREAM("frames: " << m_target_frame << " " << m_depth_frame_id << " " << msg->header.frame_id ); // << " " << msg_obj_base_.pose);
+            moveit_msgs::CollisionObject msg_obj_collision;
+            msg_obj_collision.header = msg->header;
+            msg_obj_collision.header.frame_id = m_target_frame;
 
-            moveit_msgs::CollisionObject msg_obj_moveit;
-            msg_obj_moveit.header = msg->header;
-            msg_obj_moveit.header.frame_id = m_target_frame;
-            msg_obj_moveit.operation = moveit_msgs::CollisionObject::ADD;
-            msg_obj_moveit.primitive_poses.push_back(msg_obj_pose.pose);
-            msg_obj_moveit.primitives.push_back(msg_sphere_);
-            msg_obj_moveit.type = it->type;
+            object_recognition_msgs::GetObjectInformation obj_info;
+            obj_info.request.type = it->type;
+            if (getMeshFromDatabasePose(obj_info))
+            {
+              msg_obj_collision.meshes.push_back(obj_info.response.information.ground_truth_mesh);
+              msg_obj_collision.mesh_poses.push_back(msg_obj_pose.pose);
+            }
+            else
+            {
+              msg_obj_collision.primitive_poses.push_back(msg_obj_pose.pose);
+              msg_obj_collision.primitives.push_back(msg_cylinder_);
+            }
+
+            msg_obj_collision.operation = moveit_msgs::CollisionObject::ADD;
+
+            msg_obj_collision.type = it->type;
             std::stringstream ss;
             ss << obj_id; //<< "object"
-            msg_obj_moveit.type.key = ss.str();
+            msg_obj_collision.type.key = ss.str();
             ss << "_" << it->type.key;
-            msg_obj_moveit.id = ss.str();
+            msg_obj_collision.id = ss.str();
             ++obj_id;
 
-            object_moveit_pub_.publish(msg_obj_moveit);
-
-            /*msg_obj_moveit.mesh_poses.push_back(msg_obj_pose.pose);
-            msg_obj_moveit.meshes.push_back(it->bounding_mesh);*/
-          }
+            object_moveit_pub_.publish(msg_obj_collision);
         }
       }
       catch (tf::TransformException ex){
@@ -150,12 +181,12 @@ class ObjectFilter {
     }
 
     public:
-        ObjectFilter() : nh_("~") {
+        ObjectFilter(bool virt) :
+          nh_("")
+        {
             nh_.param("object_topic", object_topic_, std::string("/recognized_object_array"));
-            object_sub_ = nh_.subscribe<object_recognition_msgs::RecognizedObjectArray>(object_topic_, 10, &ObjectFilter::obj_fake, this);
-            object_moveit_pub_ = nh_.advertise<moveit_msgs::CollisionObject>("/collision_object", 1000);
-            pub_obj_pose = nh_.advertise<geometry_msgs::PoseStamped>("/obj_pose", 1000);
-            pub_obj_poses = nh_.advertise<geometry_msgs::PoseArray>("/obj_poses", 100);
+            object_sub_ = nh_.subscribe<object_recognition_msgs::RecognizedObjectArray>(object_topic_, 10, virt?&ObjectFilter::obj_fake:&ObjectFilter::obj_real, this);
+            object_moveit_pub_ = nh_.advertise<moveit_msgs::CollisionObject>("/collision_object", 10);
             init();
         }
 
@@ -180,14 +211,15 @@ class ObjectFilter {
 };
 
 int main(int argc, char **argv) {
+  bool virt = false; //true;
   m_target_frame = "base_link";
   m_depth_frame_id = "CameraDepth_frame";
   parse_command_line(argc, argv, m_target_frame, m_depth_frame_id);
   ROS_INFO_STREAM("Object frame: " << m_target_frame << " " << m_depth_frame_id);
 
   ros::init(argc,argv,"object_filter");
-  ObjectFilter fm;
-  fm.init();
+  ObjectFilter *fm = new ObjectFilter(virt);
+  fm->init();
   while(ros::ok())
   {
     ros::spinOnce();
