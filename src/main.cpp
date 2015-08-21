@@ -6,16 +6,17 @@
 #include <ros/ros.h>
 #include <tf/tf.h>
 #include <tf/transform_listener.h>
-#include <object_recognition_msgs/RecognizedObjectArray.h>
+
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseArray.h>
+#include <shape_tools/solid_primitive_dims.h>
 
 #include <moveit_msgs/CollisionObject.h>
-#include <shape_tools/solid_primitive_dims.h>
 
 #include <boost/program_options.hpp>
 
+#include <object_recognition_msgs/RecognizedObjectArray.h>
 #include <object_recognition_msgs/GetObjectInformation.h>
 
 std::string m_target_frame;
@@ -38,8 +39,8 @@ void parse_command_line(int argc, char ** argv, std::string &m_target_frame, std
   boost::program_options::notify(vm);
   m_target_frame = vm["target_frame"].as<std::string>();
   m_depth_frame_id = vm["depth_frame_id"].as<std::string>();
-  ROS_DEBUG_STREAM("target_frame is " << m_target_frame);
-  ROS_DEBUG_STREAM("depth_frame_id is " << m_depth_frame_id);
+  ROS_INFO_STREAM("target_frame is " << m_target_frame);
+  ROS_INFO_STREAM("depth_frame_id is " << m_depth_frame_id);
 
   if (vm.count("help")) {
     std::cout << desc << "\n";
@@ -150,6 +151,7 @@ class ObjectFilter {
 
             object_recognition_msgs::GetObjectInformation obj_info;
             obj_info.request.type = it->type;
+
             if (getMeshFromDatabasePose(obj_info))
             {
               msg_obj_collision.meshes.push_back(obj_info.response.information.ground_truth_mesh);
@@ -166,7 +168,7 @@ class ObjectFilter {
             msg_obj_collision.type = it->type;
             std::stringstream ss;
             ss << obj_id; //<< "object"
-            msg_obj_collision.type.key = ss.str();
+            //msg_obj_collision.type.key = ss.str();
             ss << "_" << it->type.key;
             msg_obj_collision.id = ss.str();
             ++obj_id;
@@ -215,7 +217,6 @@ int main(int argc, char **argv) {
   m_target_frame = "base_link";
   m_depth_frame_id = "CameraDepth_frame";
   parse_command_line(argc, argv, m_target_frame, m_depth_frame_id);
-  ROS_INFO_STREAM("Object frame: " << m_target_frame << " " << m_depth_frame_id);
 
   ros::init(argc,argv,"object_filter");
   ObjectFilter *fm = new ObjectFilter(virt);
