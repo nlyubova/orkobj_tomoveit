@@ -5,7 +5,8 @@
   <arg name="depth_frame_id_pc" default="camera_depth_optical_frame" />
   <arg name="depth_frame_id_nao" default="CameraDepth_frame" />
 
-  <node pkg="convertmsg_orktomoveit" type="convertmsg_orktomoveit" name="convertmsg_orktomoveit" args=" --target_frame=$(arg target_frame_nao) --depth_frame_id=$(arg depth_frame_id_nao)" output="screen">
+  <node pkg="convertmsg_orktomoveit" type="convertmsg_orktomoveit" name="convertmsg_orktomoveit" 
+    args=" --target_frame=$(arg target_frame_nao) --depth_frame_id=$(arg depth_frame_id_nao)" output="screen">
 <!--    <param name="object_topic" value="/recognized_object_array" /> -->
     <param name="table_topic" value="/table_array" />
 <!--    <remap from="object_topic" to="/recognized_object_array" /> -->

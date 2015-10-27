@@ -2,7 +2,7 @@
 <package>
   <name>convertmsg_orktomoveit</name>
   <version>0.0.0</version>
-  <description>The convert_tabletop_msgs package</description>
+  <description>Converter of ORKobject messages into MoveIt! messages</description>
   <author email="natalia.lyubova@gmail.com">Natalia Lyubova</author>
   <maintainer email="natalia.lyubova@gmail.com">Natalia Lyubova</maintainer>
 
