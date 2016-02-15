@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <vector>
 #include <string>
+
 #include <ros/ros.h>
 #include <tf/tf.h>
 #include <tf/transform_listener.h>
-
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseArray.h>
@@ -14,10 +14,10 @@
 
 #include <moveit_msgs/CollisionObject.h>
 
-#include <boost/program_options.hpp>
-
 #include <object_recognition_msgs/RecognizedObjectArray.h>
 #include <object_recognition_msgs/GetObjectInformation.h>
+
+#include <boost/program_options.hpp>
 
 std::string m_target_frame;
 std::string m_depth_frame_id;
@@ -110,7 +110,7 @@ class ObjectFilter {
       msg_obj_poses.poses.push_back(msg_obj_pose.pose);
     }
 
-    bool getMeshFromDatabasePose(object_recognition_msgs::GetObjectInformation &obj_info)
+    bool getMeshFromDB(object_recognition_msgs::GetObjectInformation &obj_info)
     {
       //! Client for getting the mesh for a database object
       ros::ServiceClient get_model_mesh_srv_;
@@ -140,10 +140,12 @@ class ObjectFilter {
         int obj_id = 0;
         for (it = msg->objects.begin(); it != msg->objects.end(); ++it)
         {
-            listener_.waitForTransform(m_target_frame, msg->header.frame_id, msg->header.stamp, ros::Duration(3.0));
             msg_obj_cam_.header = msg->header;
             msg_obj_cam_.pose = it->pose.pose.pose;
-            listener_.transformPose(m_target_frame, msg->header.stamp, msg_obj_cam_, m_depth_frame_id, msg_obj_pose);
+
+            ros::Time t = ros::Time(0);
+            listener_.waitForTransform(m_target_frame, msg->header.frame_id, t, ros::Duration(3.0));
+            listener_.transformPose(m_target_frame, t, msg_obj_cam_, msg->header.frame_id, msg_obj_pose);
 
             moveit_msgs::CollisionObject msg_obj_collision;
             msg_obj_collision.header = msg->header;
@@ -152,7 +154,7 @@ class ObjectFilter {
             object_recognition_msgs::GetObjectInformation obj_info;
             obj_info.request.type = it->type;
 
-            if (getMeshFromDatabasePose(obj_info))
+            if (getMeshFromDB(obj_info))
             {
               msg_obj_collision.meshes.push_back(obj_info.response.information.ground_truth_mesh);
               msg_obj_collision.mesh_poses.push_back(msg_obj_pose.pose);
@@ -218,12 +220,16 @@ int main(int argc, char **argv) {
   m_depth_frame_id = "CameraDepth_frame";
   parse_command_line(argc, argv, m_target_frame, m_depth_frame_id);
 
-  ros::init(argc,argv,"object_filter");
+  ros::init(argc,argv,"orkobj_tomoveit");
   ObjectFilter *fm = new ObjectFilter(virt);
   fm->init();
+
+  /*ros::AsyncSpinner spinner(1);
+  spinner.start();*/
+
+  ros::Rate rate(10);
   while(ros::ok())
-  {
     ros::spinOnce();
-  }
+
   return 0;
 }

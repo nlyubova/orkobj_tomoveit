@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>convertmsg_orktomoveit</name>
+  <name>orkobj_tomoveit</name>
   <version>0.0.0</version>
-  <description>Converter of ORKobject messages into MoveIt! messages</description>
+  <description>Wrapper of ORK object recognition messages to MoveIt! messages</description>
   <author email="natalia.lyubova@gmail.com">Natalia Lyubova</author>
   <maintainer email="natalia.lyubova@gmail.com">Natalia Lyubova</maintainer>
 
