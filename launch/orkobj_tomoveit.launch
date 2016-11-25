@@ -1,14 +1,12 @@
 <launch>
 
-  <arg name="target_frame_pc" default="camera_depth_optical_frame" />
-  <arg name="target_frame_nao" default="base_link" />
-  <arg name="depth_frame_id_pc" default="camera_depth_optical_frame" />
-  <arg name="depth_frame_id_nao" default="CameraDepth_frame" />
+  <arg name="target_frame" default="odom" />
 
   <node pkg="orkobj_tomoveit" type="orkobj_tomoveit" name="orkobj_tomoveit" 
-    args=" --target_frame=$(arg target_frame_nao) --depth_frame_id=$(arg depth_frame_id_nao)" output="screen">
+    args=" --target_frame=$(arg target_frame)" output="screen">
     <param name="table_topic" value="/table_array" />
    <param name="object_topic" value="/recognized_object_array" />
+   <param name="target_frame" value="odom" />
   </node>
 
 </launch>
